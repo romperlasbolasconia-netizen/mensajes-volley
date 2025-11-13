@@ -1,1 +1,1 @@
-
+loadstring(game:HttpGet('https://raw.githubusercontent.com/romperlasbolasconia-netizen/mensajes-volley/refs/heads/main/mensajes'))()
