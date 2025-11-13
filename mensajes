@@ -1,37 +1,312 @@
--- Script de Rueda de Mensajes - Versión Funcional
+-- Rueda de Mensajes Rápidos para Móvil
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 
--- Configuración
-local WHEEL_SECTIONS = 8
-local WHEEL_RADIUS = 100
-
--- Tus mensajes personalizados
-local SECTION_DATA = {
-    {text = "ez", color = Color3.fromRGB(255, 100, 100)},
-    {text = "desintala", color = Color3.fromRGB(255, 200, 100)},
-    {text = "chill", color = Color3.fromRGB(100, 255, 100)},
-    {text = "remato", color = Color3.fromRGB(100, 200, 255)},
-    {text = "stfu", color = Color3.fromRGB(200, 100, 255)},
-    {text = "tranquilo", color = Color3.fromRGB(255, 100, 200)},
-    {text = "malo", color = Color3.fromRGB(100, 255, 255)},
-    {text = "my bad", color = Color3.fromRGB(255, 255, 100)}
+-- Mensajes rápidos
+local MENSAJES_RAPIDOS = {
+    "ez",
+    "chill", 
+    "my bad",
+    "desintala plz",
+    "gg",
+    "remato",
+    "coloco",
+    "pancho"
 }
 
--- Variables globales
-local wheelGUI, sections = {}, centerCircle, mainFrame, selectedLabel
-local isWheelVisible = false
+-- Colores para los botones
+local COLORES = {
+    Color3.fromRGB(255, 100, 100),
+    Color3.fromRGB(255, 180, 100),
+    Color3.fromRGB(255, 255, 100),
+    Color3.fromRGB(180, 255, 100),
+    Color3.fromRGB(100, 255, 180),
+    Color3.fromRGB(100, 200, 255),
+    Color3.fromRGB(180, 100, 255),
+    Color3.fromRGB(255, 100, 200)
+}
 
--- Función para crear la GUI (similar a los scripts anteriores que funcionaban)
-local function createWheelGUI()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "MessageWheel"
+-- Variables
+local screenGui, mainFrame, centerButton, botones = {}, nil
+local ruedaAbierta = false
+local arrastrando = false
+local posicionInicial, posicionArrastre
+
+-- Crear la interfaz
+local function crearInterfaz()
+    -- ScreenGui principal
+    screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "RuedaMensajes"
+    screenGui.ResetOnSpawn = false
     
-    -- Usar el mismo sistema de parent que en los scripts anteriores
+    -- Marco principal (movible)
+    mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MarcoPrincipal"
+    mainFrame.Size = UDim2.new(0, 200, 0, 200)
+    mainFrame.Position = UDim2.new(0.1, 0, 0.7, 0)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    mainFrame.BackgroundTransparency = 0.1
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    
+    local esquinas = Instance.new("UICorner")
+    esquinas.CornerRadius = UDim.new(0.1, 0)
+    esquinas.Parent = mainFrame
+    
+    local borde = Instance.new("UIStroke")
+    borde.Color = Color3.fromRGB(100, 100, 255)
+    borde.Thickness = 2
+    borde.Parent = mainFrame
+    
+    -- Botón central para abrir/cerrar
+    centerButton = Instance.new("TextButton")
+    centerButton.Name = "BotonCentral"
+    centerButton.Size = UDim2.new(0, 70, 0, 70)
+    centerButton.Position = UDim2.new(0.5, -35, 0.5, -35)
+    centerButton.AnchorPoint = Vector2.new(0.5, 0.5)
+    centerButton.BackgroundColor3 = Color3.fromRGB(80, 120, 255)
+    centerButton.BorderSizePixel = 0
+    centerButton.Text = "💬\nMENSAJES"
+    centerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    centerButton.TextScaled = true
+    centerButton.Font = Enum.Font.GothamBold
+    centerButton.ZIndex = 10
+    
+    local centerEsquinas = Instance.new("UICorner")
+    centerEsquinas.CornerRadius = UDim.new(1, 0)
+    centerEsquinas.Parent = centerButton
+    
+    local centerBorde = Instance.new("UIStroke")
+    centerBorde.Color = Color3.fromRGB(255, 255, 255)
+    centerBorde.Thickness = 2
+    centerBorde.Parent = centerButton
+    
+    centerButton.Parent = mainFrame
+    
+    -- Crear botones de mensajes en forma de rueda
+    botones = {}
+    local cantidadMensajes = #MENSAJES_RAPIDOS
+    local radio = 80
+    local anguloPorBoton = (2 * math.pi) / cantidadMensajes
+    
+    for i = 1, cantidadMensajes do
+        local angulo = (i - 1) * anguloPorBoton
+        local x = math.cos(angulo) * radio
+        local y = math.sin(angulo) * radio
+        
+        local boton = Instance.new("TextButton")
+        boton.Name = "Boton_" .. i
+        boton.Size = UDim2.new(0, 60, 0, 60)
+        boton.Position = UDim2.new(0.5, x - 30, 0.5, y - 30)
+        boton.AnchorPoint = Vector2.new(0.5, 0.5)
+        boton.BackgroundColor3 = COLORES[i]
+        boton.BackgroundTransparency = 0.2
+        boton.BorderSizePixel = 0
+        boton.Text = MENSAJES_RAPIDOS[i]
+        boton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        boton.TextScaled = true
+        boton.Font = Enum.Font.GothamBold
+        boton.ZIndex = 5
+        boton.Visible = false
+        
+        local botonEsquinas = Instance.new("UICorner")
+        botonEsquinas.CornerRadius = UDim.new(0.15, 0)
+        botonEsquinas.Parent = boton
+        
+        local botonBorde = Instance.new("UIStroke")
+        botonBorde.Color = Color3.fromRGB(255, 255, 255)
+        botonBorde.Thickness = 1.5
+        botonBorde.Parent = boton
+        
+        boton.Parent = mainFrame
+        botones[i] = boton
+    end
+    
+    -- Etiqueta de estado
+    local etiquetaEstado = Instance.new("TextLabel")
+    etiquetaEstado.Name = "Estado"
+    etiquetaEstado.Size = UDim2.new(1, -10, 0, 25)
+    etiquetaEstado.Position = UDim2.new(0, 5, 1, 5)
+    etiquetaEstado.BackgroundTransparency = 1
+    etiquetaEstado.Text = "Toca para abrir"
+    etiquetaEstado.TextColor3 = Color3.fromRGB(200, 200, 200)
+    etiquetaEstado.TextScaled = true
+    etiquetaEstado.Font = Enum.Font.Gotham
+    etiquetaEstado.Visible = true
+    
+    etiquetaEstado.Parent = mainFrame
+    
+    mainFrame.Parent = screenGui
+    return screenGui, etiquetaEstado
+end
+
+-- Función para abrir la rueda con animación
+local function abrirRueda()
+    if ruedaAbierta then return end
+    
+    ruedaAbierta = true
+    centerButton.Visible = false
+    
+    -- Animación de aparición de botones
+    for i, boton in ipairs(botones) do
+        boton.Visible = true
+        boton.Size = UDim2.new(0, 10, 0, 10)
+        boton.BackgroundTransparency = 0.8
+        
+        local infoTween = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(boton, infoTween, {
+            Size = UDim2.new(0, 60, 0, 60),
+            BackgroundTransparency = 0.2
+        })
+        tween:Play()
+    end
+    
+    if estadoLabel then
+        estadoLabel.Text = "👆 Elige un mensaje"
+    end
+end
+
+-- Función para cerrar la rueda con animación
+local function cerrarRueda()
+    if not ruedaAbierta then return end
+    
+    ruedaAbierta = false
+    
+    -- Animación de desaparición
+    for i, boton in ipairs(botones) do
+        local infoTween = TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        local tween = TweenService:Create(boton, infoTween, {
+            Size = UDim2.new(0, 10, 0, 10),
+            BackgroundTransparency = 0.8
+        })
+        tween:Play()
+    end
+    
+    -- Ocultar botones después de la animación
+    delay(0.25, function()
+        for _, boton in ipairs(botones) do
+            boton.Visible = false
+        end
+        centerButton.Visible = true
+    end)
+    
+    if estadoLabel then
+        estadoLabel.Text = "Toca para abrir"
+    end
+end
+
+-- Función para enviar mensaje
+local function enviarMensaje(mensaje)
+    print("🚀 Mensaje rápido: " .. mensaje)
+    
+    -- Intentar enviar al chat del juego
+    local funciono, resultado = pcall(function()
+        local eventosChat = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+        if eventosChat then
+            local decirMensaje = eventosChat:FindFirstChild("SayMessageRequest")
+            if decirMensaje then
+                decirMensaje:FireServer(mensaje, "All")
+                return true
+            end
+        end
+        return false
+    end)
+    
+    if not funciono then
+        print("💬 Mensaje: " .. mensaje)
+    end
+end
+
+-- Configurar interacciones
+local function configurarInteracciones()
+    -- Botón central
+    centerButton.MouseButton1Click:Connect(function()
+        if ruedaAbierta then
+            cerrarRueda()
+        else
+            abrirRueda()
+        end
+    end)
+    
+    -- Configurar cada botón de mensaje
+    for i, boton in ipairs(botones) do
+        boton.MouseButton1Click:Connect(function()
+            if not ruedaAbierta then return end
+            
+            local mensaje = MENSAJES_RAPIDOS[i]
+            
+            -- Efecto visual al presionar
+            boton.BackgroundTransparency = 0
+            boton.Text = "✓"
+            
+            -- Enviar mensaje
+            enviarMensaje(mensaje)
+            
+            -- Restaurar botón después de un momento
+            delay(0.5, function()
+                if boton then
+                    boton.BackgroundTransparency = 0.2
+                    boton.Text = mensaje
+                end
+            end)
+            
+            -- Cerrar rueda después de enviar
+            delay(0.8, function()
+                cerrarRueda()
+            end)
+        end)
+        
+        -- Efecto hover para PC
+        boton.MouseEnter:Connect(function()
+            if ruedaAbierta then
+                boton.BackgroundTransparency = 0.1
+            end
+        end)
+        
+        boton.MouseLeave:Connect(function()
+            if ruedaAbierta then
+                boton.BackgroundTransparency = 0.2
+            end
+        end)
+    end
+    
+    -- Hacer la ventana arrastrable
+    mainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            arrastrando = true
+            posicionArrastre = input.Position
+            posicionInicial = mainFrame.Position
+        end
+    end)
+    
+    mainFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            arrastrando = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if arrastrando and input.UserInputType == Enum.UserInputType.Touch then
+            local diferencia = input.Position - posicionArrastre
+            mainFrame.Position = UDim2.new(
+                posicionInicial.X.Scale, 
+                posicionInicial.X.Offset + diferencia.X,
+                posicionInicial.Y.Scale, 
+                posicionInicial.Y.Offset + diferencia.Y
+            )
+        end
+    end)
+end
+
+-- Función principal
+local function inicializar()
+    -- Crear interfaz
+    screenGui, estadoLabel = crearInterfaz()
+    
+    -- Parentear correctamente
     if gethui then
         screenGui.Parent = gethui()
     elseif syn and syn.protect_gui then
@@ -40,238 +315,16 @@ local function createWheelGUI()
     else
         screenGui.Parent = game:GetService("CoreGui")
     end
-
-    -- Marco principal
-    mainFrame = Instance.new("Frame")
-    mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 250, 0, 250)
-    mainFrame.Position = UDim2.new(0.5, -125, 0.5, -125)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    mainFrame.BackgroundTransparency = 0.1
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Visible = true
     
-    local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0.1, 0)
-    mainCorner.Parent = mainFrame
-
-    -- Botón central
-    centerCircle = Instance.new("TextButton")
-    centerCircle.Name = "CenterButton"
-    centerCircle.Size = UDim2.new(0, 80, 0, 80)
-    centerCircle.Position = UDim2.new(0.5, -40, 0.5, -40)
-    centerCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-    centerCircle.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-    centerCircle.BorderSizePixel = 0
-    centerCircle.Text = "MENSAJES"
-    centerCircle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    centerCircle.TextScaled = true
-    centerCircle.Font = Enum.Font.GothamBold
-    centerCircle.ZIndex = 10
-    centerCircle.Visible = true
+    -- Configurar interacciones
+    configurarInteracciones()
     
-    local centerCorner = Instance.new("UICorner")
-    centerCorner.CornerRadius = UDim.new(1, 0)
-    centerCorner.Parent = centerCircle
-
-    centerCircle.Parent = mainFrame
-
-    -- Crear secciones
-    local angleStep = 360 / WHEEL_SECTIONS
-    
-    for i = 1, WHEEL_SECTIONS do
-        local sectionData = SECTION_DATA[i]
-        
-        -- Calcular posición en círculo
-        local angle = math.rad((i - 1) * angleStep + angleStep/2)
-        local x = math.cos(angle) * WHEEL_RADIUS
-        local y = math.sin(angle) * WHEEL_RADIUS
-        
-        -- Crear botón de sección
-        local section = Instance.new("TextButton")
-        section.Name = "Section_" .. i
-        section.Size = UDim2.new(0, 60, 0, 60)
-        section.Position = UDim2.new(0.5, x - 30, 0.5, y - 30)
-        section.AnchorPoint = Vector2.new(0.5, 0.5)
-        section.BackgroundColor3 = sectionData.color
-        section.BackgroundTransparency = 0.3
-        section.BorderSizePixel = 0
-        section.Text = sectionData.text
-        section.TextColor3 = Color3.fromRGB(255, 255, 255)
-        section.TextScaled = true
-        section.Font = Enum.Font.GothamBold
-        section.ZIndex = 5
-        section.Visible = false
-        
-        local sectionCorner = Instance.new("UICorner")
-        sectionCorner.CornerRadius = UDim.new(0.2, 0)
-        sectionCorner.Parent = section
-
-        section.Parent = mainFrame
-        sections[i] = section
-    end
-
-    -- Etiqueta de selección
-    selectedLabel = Instance.new("TextLabel")
-    selectedLabel.Name = "SelectedLabel"
-    selectedLabel.Size = UDim2.new(1, -20, 0, 30)
-    selectedLabel.Position = UDim2.new(0, 10, 1, 5)
-    selectedLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    selectedLabel.BackgroundTransparency = 0.2
-    selectedLabel.Text = "Selecciona un mensaje"
-    selectedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    selectedLabel.TextScaled = true
-    selectedLabel.Font = Enum.Font.Gotham
-    selectedLabel.Visible = false
-    selectedLabel.ZIndex = 15
-    
-    local selectedCorner = Instance.new("UICorner")
-    selectedCorner.CornerRadius = UDim.new(0.1, 0)
-    selectedCorner.Parent = selectedLabel
-
-    selectedLabel.Parent = mainFrame
-    mainFrame.Parent = screenGui
-    
-    return screenGui
+    print("🎯 Rueda de Mensajes Rápidos CARGADA")
+    print("💬 Botón central para abrir/cerrar")
+    print("👆 8 mensajes disponibles")
+    print("🧭 Arrastra para mover")
+    print("📱 Optimizado para móvil")
 end
 
--- Función para mostrar la rueda
-local function showWheel()
-    isWheelVisible = true
-    centerCircle.Visible = false
-    
-    for i, section in ipairs(sections) do
-        section.Visible = true
-        section.BackgroundTransparency = 0.3
-    end
-    
-    if selectedLabel then
-        selectedLabel.Visible = true
-        selectedLabel.Text = "Toca un mensaje"
-    end
-end
-
--- Función para ocultar la rueda
-local function hideWheel()
-    isWheelVisible = false
-    
-    for i, section in ipairs(sections) do
-        section.Visible = false
-    end
-    
-    if selectedLabel then
-        selectedLabel.Visible = false
-    end
-    
-    centerCircle.Visible = true
-end
-
--- Función para enviar mensaje (igual que en scripts anteriores)
-local function sendMessage(message)
-    print("Mensaje: " .. message)
-    
-    -- Intentar enviar al chat del juego
-    local success, result = pcall(function()
-        local chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
-        if chatEvents then
-            local sayMessage = chatEvents:FindFirstChild("SayMessageRequest")
-            if sayMessage then
-                sayMessage:FireServer(message, "All")
-            end
-        end
-    end)
-    
-    if not success then
-        -- Método alternativo
-        pcall(function()
-            game:GetService("TextChatService").TextChannels.RBXGeneral:SendAsync(message)
-        end)
-    end
-end
-
--- Función principal (estructura similar a scripts anteriores)
-local function initializeWheel()
-    wheelGUI = createWheelGUI()
-    
-    print("Rueda de mensajes cargada!")
-    print("Controles:")
-    print("- Toca el botón azul para abrir/cerrar")
-    print("- Toca cualquier sección para enviar mensaje")
-
-    -- Configurar botón central
-    centerCircle.MouseButton1Click:Connect(function()
-        if isWheelVisible then
-            hideWheel()
-        else
-            showWheel()
-        end
-    end)
-
-    -- Configurar secciones
-    for i, section in ipairs(sections) do
-        section.MouseButton1Click:Connect(function()
-            if not isWheelVisible then return end
-            
-            local sectionData = SECTION_DATA[i]
-            local message = sectionData.text
-            
-            -- Efecto visual
-            local originalTransparency = section.BackgroundTransparency
-            section.BackgroundTransparency = 0
-            
-            -- Mostrar selección
-            if selectedLabel then
-                selectedLabel.Text = "Enviado: " .. message
-            end
-            
-            -- Enviar mensaje
-            sendMessage(message)
-            
-            -- Restaurar y ocultar después de un momento
-            delay(1.5, function()
-                if section then
-                    section.BackgroundTransparency = originalTransparency
-                end
-                if isWheelVisible then
-                    hideWheel()
-                end
-            end)
-        end)
-    end
-    
-    -- Hacer movible (como en scripts anteriores)
-    local dragging = false
-    local dragStart = nil
-    local startPos = nil
-    
-    mainFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = mainFrame.Position
-            mainFrame.BackgroundTransparency = 0.05
-        end
-    end)
-    
-    mainFrame.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-            mainFrame.BackgroundTransparency = 0.1
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-            local delta = input.Position - dragStart
-            mainFrame.Position = UDim2.new(
-                startPos.X.Scale, 
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale, 
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-end
-
--- Inicializar inmediatamente
-initializeWheel()
+-- Iniciar
+inicializar()
