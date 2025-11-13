@@ -1,356 +1,256 @@
--- Script de Rueda de Mensajes Interactiva Mejorada
+-- Script de Rueda de Mensajes para Móvil - Versión Mejorada
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 
--- Configuración de la rueda
-local WHEEL_SECTIONS = 8
+-- Configuración para móvil
+local WHEEL_SECTIONS = 6
 local WHEEL_RADIUS = 100
-local CENTER_POSITION = UDim2.new(0.5, 0, 0.7, 0) -- Posición más baja para mejor acceso
+local CENTER_POSITION = UDim2.new(0.15, 0, 0.8, 0)
 
--- Mensajes para cada sección
-local SECTION_MESSAGES = {
-    "Ez",
-    "Stfu",
-    "Chill",
-    "Remato",
-    "Desintala plz",
-    "xd",
-    "Nt",
-    "tranquilo"
-}
-
--- Colores para cada sección
-local SECTION_COLORS = {
-    Color3.fromRGB(255, 100, 100),
-    Color3.fromRGB(255, 200, 100),
-    Color3.fromRGB(100, 255, 100),
-    Color3.fromRGB(100, 200, 255),
-    Color3.fromRGB(200, 100, 255),
-    Color3.fromRGB(255, 100, 200),
-    Color3.fromRGB(100, 255, 255),
-    Color3.fromRGB(255, 255, 100)
+-- Mensajes y emojis para cada sección
+local SECTION_DATA = {
+    {text = "¡Hola!", emoji = "👋", color = Color3.fromRGB(255, 100, 100)},
+    {text = "¡Genial!", emoji = "😎", color = Color3.fromRGB(255, 200, 100)},
+    {text = "¡Ayuda!", emoji = "🆘", color = Color3.fromRGB(100, 255, 100)},
+    {text = "¡Gracias!", emoji = "🙏", color = Color3.fromRGB(100, 200, 255)},
+    {text = "¡Wow!", emoji = "😮", color = Color3.fromRGB(200, 100, 255)},
+    {text = "¡Risa!", emoji = "😂", color = Color3.fromRGB(255, 100, 200)}
 }
 
 -- Variables globales
-local wheelGUI, sections, centerCircle, selectedMessage, mainFrame
+local wheelGUI, sections = {}, centerCircle, mainFrame
 local isWheelVisible = false
-local isMinimized = false
 local wheelCenter = nil
-local dragConnection = nil
 
--- Función para crear la interfaz gráfica
+-- Función para crear la interfaz
 local function createWheelGUI()
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "MessageWheel"
+    screenGui.Name = "MessageWheelMobile"
     screenGui.ResetOnSpawn = false
     
-    -- Contenedor principal (ahora movible)
+    -- Marco principal
     mainFrame = Instance.new("Frame")
-    mainFrame.Name = "WheelContainer"
-    mainFrame.Size = UDim2.new(0, 250, 0, 250)
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 220, 0, 220)
     mainFrame.Position = CENTER_POSITION
-    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     mainFrame.BackgroundTransparency = 0.2
     mainFrame.BorderSizePixel = 0
-    mainFrame.Active = true
-    mainFrame.Draggable = true -- Hacerlo movible
-    mainFrame.Selectable = true
+    mainFrame.Visible = true
     
     local mainCorner = Instance.new("UICorner")
     mainCorner.CornerRadius = UDim.new(0.1, 0)
     mainCorner.Parent = mainFrame
     
-    -- Barra de título con botones
-    local titleBar = Instance.new("Frame")
-    titleBar.Name = "TitleBar"
-    titleBar.Size = UDim2.new(1, 0, 0, 25)
-    titleBar.Position = UDim2.new(0, 0, 0, 0)
-    titleBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    titleBar.BorderSizePixel = 0
-    titleBar.ZIndex = 20
+    local mainStroke = Instance.new("UIStroke")
+    mainStroke.Color = Color3.fromRGB(255, 255, 255)
+    mainStroke.Thickness = 2
+    mainStroke.Parent = mainFrame
     
-    local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0.1, 0)
-    titleCorner.Parent = titleBar
-    
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Name = "TitleLabel"
-    titleLabel.Size = UDim2.new(0.6, 0, 1, 0)
-    titleLabel.Position = UDim2.new(0, 5, 0, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "Rueda de Mensajes"
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextScaled = true
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.ZIndex = 21
-    titleLabel.Parent = titleBar
-    
-    -- Botón minimizar
-    local minimizeBtn = Instance.new("TextButton")
-    minimizeBtn.Name = "MinimizeBtn"
-    minimizeBtn.Size = UDim2.new(0, 20, 0, 20)
-    minimizeBtn.Position = UDim2.new(1, -45, 0, 2)
-    minimizeBtn.AnchorPoint = Vector2.new(1, 0)
-    minimizeBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-    minimizeBtn.BorderSizePixel = 0
-    minimizeBtn.Text = "_"
-    minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    minimizeBtn.TextScaled = true
-    minimizeBtn.Font = Enum.Font.GothamBold
-    minimizeBtn.ZIndex = 21
-    
-    local minimizeCorner = Instance.new("UICorner")
-    minimizeCorner.CornerRadius = UDim.new(0.3, 0)
-    minimizeCorner.Parent = minimizeBtn
-    
-    -- Botón cerrar
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Name = "CloseBtn"
-    closeBtn.Size = UDim2.new(0, 20, 0, 20)
-    closeBtn.Position = UDim2.new(1, -20, 0, 2)
-    closeBtn.AnchorPoint = Vector2.new(1, 0)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-    closeBtn.BorderSizePixel = 0
-    closeBtn.Text = "X"
-    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeBtn.TextScaled = true
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.ZIndex = 21
-    
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0.3, 0)
-    closeCorner.Parent = closeBtn
-    
-    minimizeBtn.Parent = titleBar
-    closeBtn.Parent = titleBar
-    titleBar.Parent = mainFrame
-    
-    -- Círculo central
-    centerCircle = Instance.new("Frame")
-    centerCircle.Name = "Center"
-    centerCircle.Size = UDim2.new(0, 60, 0, 60)
-    centerCircle.Position = UDim2.new(0.5, -30, 0.5, -30)
+    -- Botón central para abrir/cerrar
+    centerCircle = Instance.new("TextButton")
+    centerCircle.Name = "CenterButton"
+    centerCircle.Size = UDim2.new(0, 80, 0, 80)
+    centerCircle.Position = UDim2.new(0.5, -40, 0.5, -40)
     centerCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-    centerCircle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    centerCircle.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
     centerCircle.BorderSizePixel = 0
+    centerCircle.Text = "💬\nMENSAJES"
+    centerCircle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    centerCircle.TextScaled = true
+    centerCircle.Font = Enum.Font.GothamBold
     centerCircle.ZIndex = 10
-    centerCircle.Visible = false
+    centerCircle.Visible = true
     
     local centerCorner = Instance.new("UICorner")
     centerCorner.CornerRadius = UDim.new(1, 0)
     centerCorner.Parent = centerCircle
     
-    local centerLabel = Instance.new("TextLabel")
-    centerLabel.Name = "CenterLabel"
-    centerLabel.Size = UDim2.new(1, 0, 1, 0)
-    centerLabel.BackgroundTransparency = 1
-    centerLabel.Text = "TOCA"
-    centerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    centerLabel.TextScaled = true
-    centerLabel.Font = Enum.Font.GothamBold
-    centerLabel.Parent = centerCircle
+    local centerStroke = Instance.new("UIStroke")
+    centerStroke.Color = Color3.fromRGB(255, 255, 255)
+    centerStroke.Thickness = 3
+    centerStroke.Parent = centerCircle
     
     centerCircle.Parent = mainFrame
     
-    -- Crear secciones de la rueda
-    sections = {}
+    -- Crear secciones visibles como botones
     local angleStep = 360 / WHEEL_SECTIONS
     
     for i = 1, WHEEL_SECTIONS do
-        local section = Instance.new("Frame")
+        local sectionData = SECTION_DATA[i]
+        
+        -- Calcular posición en círculo
+        local angle = math.rad((i - 1) * angleStep + angleStep/2)
+        local x = math.cos(angle) * WHEEL_RADIUS
+        local y = math.sin(angle) * WHEEL_RADIUS
+        
+        -- Crear botón de sección
+        local section = Instance.new("TextButton")
         section.Name = "Section_" .. i
-        section.Size = UDim2.new(0, WHEEL_RADIUS * 2, 0, WHEEL_RADIUS * 2)
-        section.Position = UDim2.new(0.5, -WHEEL_RADIUS, 0.5, -WHEEL_RADIUS)
+        section.Size = UDim2.new(0, 70, 0, 70)
+        section.Position = UDim2.new(0.5, x - 35, 0.5, y - 35)
         section.AnchorPoint = Vector2.new(0.5, 0.5)
-        section.BackgroundTransparency = 0.7
-        section.BackgroundColor3 = SECTION_COLORS[i]
+        section.BackgroundColor3 = sectionData.color
+        section.BackgroundTransparency = 0.2
         section.BorderSizePixel = 0
-        section.ZIndex = 1
+        section.Text = sectionData.emoji .. "\n" .. string.sub(sectionData.text, 1, 4)
+        section.TextColor3 = Color3.fromRGB(255, 255, 255)
+        section.TextScaled = true
+        section.Font = Enum.Font.GothamBold
+        section.ZIndex = 5
         section.Visible = false
         
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(1, 0)
-        corner.Parent = section
+        local sectionCorner = Instance.new("UICorner")
+        sectionCorner.CornerRadius = UDim.new(0.2, 0)
+        sectionCorner.Parent = section
         
-        -- Clip para crear forma de quesito
-        local clip = Instance.new("Frame")
-        clip.Name = "Clip"
-        clip.Size = UDim2.new(0.5, 0, 0.5, 0)
-        clip.Position = UDim2.new(0.5, 0, 0.5, 0)
-        clip.AnchorPoint = Vector2.new(0.5, 0.5)
-        clip.BackgroundColor3 = section.BackgroundColor3
-        clip.BorderSizePixel = 0
-        clip.ZIndex = 2
+        local sectionStroke = Instance.new("UIStroke")
+        sectionStroke.Color = Color3.fromRGB(255, 255, 255)
+        sectionStroke.Thickness = 2
+        sectionStroke.Parent = section
         
-        local clipCorner = Instance.new("UICorner")
-        clipCorner.CornerRadius = UDim.new(0, 0)
-        clipCorner.Parent = clip
+        -- Tooltip para mostrar texto completo
+        local tooltip = Instance.new("TextLabel")
+        tooltip.Name = "Tooltip"
+        tooltip.Size = UDim2.new(1.5, 0, 0, 30)
+        tooltip.Position = UDim2.new(0.5, 0, -0.5, 0)
+        tooltip.AnchorPoint = Vector2.new(0.5, 1)
+        tooltip.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        tooltip.BackgroundTransparency = 0.3
+        tooltip.Text = sectionData.text
+        tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tooltip.TextScaled = true
+        tooltip.Font = Enum.Font.Gotham
+        tooltip.Visible = false
+        tooltip.ZIndex = 20
         
-        clip.Parent = section
+        local tooltipCorner = Instance.new("UICorner")
+        tooltipCorner.CornerRadius = UDim.new(0.1, 0)
+        tooltipCorner.Parent = tooltip
         
-        -- Etiqueta del mensaje
-        local label = Instance.new("TextLabel")
-        label.Name = "Label"
-        label.Size = UDim2.new(0, 80, 0, 30)
-        label.Position = UDim2.new(0.7, 0, 0.1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = SECTION_MESSAGES[i]
-        label.TextColor3 = Color3.fromRGB(255, 255, 255)
-        label.TextScaled = true
-        label.Font = Enum.Font.GothamBold
-        label.TextStrokeTransparency = 0
-        label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        label.ZIndex = 3
-        label.Visible = false
-        label.Parent = section
+        tooltip.Parent = section
         
         section.Parent = mainFrame
         sections[i] = section
     end
     
-    -- Texto de mensaje seleccionado
-    selectedMessage = Instance.new("TextLabel")
-    selectedMessage.Name = "SelectedMessage"
-    selectedMessage.Size = UDim2.new(1, 0, 0, 40)
-    selectedMessage.Position = UDim2.new(0, 0, 1, 10)
-    selectedMessage.BackgroundTransparency = 1
-    selectedMessage.Text = ""
-    selectedMessage.TextColor3 = Color3.fromRGB(255, 255, 255)
-    selectedMessage.TextScaled = true
-    selectedMessage.Font = Enum.Font.GothamBold
-    selectedMessage.TextStrokeTransparency = 0
-    selectedMessage.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    selectedMessage.Visible = false
-    selectedMessage.Parent = mainFrame
+    -- Etiqueta de mensaje seleccionado
+    local selectedLabel = Instance.new("TextLabel")
+    selectedLabel.Name = "SelectedLabel"
+    selectedLabel.Size = UDim2.new(1, -20, 0, 40)
+    selectedLabel.Position = UDim2.new(0, 10, 1, 10)
+    selectedLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    selectedLabel.BackgroundTransparency = 0.1
+    selectedLabel.Text = "Toca un botón para enviar mensaje"
+    selectedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    selectedLabel.TextScaled = true
+    selectedLabel.Font = Enum.Font.GothamBold
+    selectedLabel.Visible = false
+    selectedLabel.ZIndex = 15
+    
+    local selectedCorner = Instance.new("UICorner")
+    selectedCorner.CornerRadius = UDim.new(0.1, 0)
+    selectedCorner.Parent = selectedLabel
+    
+    local selectedStroke = Instance.new("UIStroke")
+    selectedStroke.Color = Color3.fromRGB(255, 255, 255)
+    selectedStroke.Thickness = 1
+    selectedStroke.Parent = selectedLabel
+    
+    selectedLabel.Parent = mainFrame
     
     mainFrame.Parent = screenGui
-    return screenGui
+    return screenGui, selectedLabel
 end
 
--- Función para mostrar la rueda
+-- Función para mostrar la rueda con animación
 local function showWheel()
-    if isMinimized then
-        -- Restaurar desde minimizado
-        mainFrame.Size = UDim2.new(0, 250, 0, 250)
-        isMinimized = false
-    end
+    isWheelVisible = true
+    centerCircle.Visible = false
     
-    centerCircle.Visible = true
-    selectedMessage.Visible = false
-    
-    local angleStep = 360 / WHEEL_SECTIONS
-    
+    -- Mostrar todas las secciones
     for i, section in ipairs(sections) do
         section.Visible = true
-        section.BackgroundTransparency = 0.7
+        section.BackgroundTransparency = 0.2
         
-        -- Rotar la sección
-        local startAngle = (i - 1) * angleStep
-        local endAngle = i * angleStep
-        local midAngle = (startAngle + endAngle) / 2
-        
-        -- Posicionar el clip para crear forma de quesito
-        local clip = section:FindFirstChild("Clip")
-        if clip then
-            clip.Size = UDim2.new(0.5, 0, 0.5, 0)
-            clip.Position = UDim2.new(0.5, 0, 0.5, 0)
-            clip.Rotation = midAngle
-        end
-        
-        -- Ocultar etiqueta inicialmente
-        local label = section:FindFirstChild("Label")
-        if label then
-            label.Visible = false
-        end
+        -- Animación de escala
+        section.Size = UDim2.new(0, 10, 0, 10)
+        local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(section, tweenInfo, {Size = UDim2.new(0, 70, 0, 70)})
+        tween:Play()
     end
     
-    isWheelVisible = true
+    -- Mostrar instrucción
+    if selectedLabel then
+        selectedLabel.Visible = true
+        selectedLabel.Text = "👆 Toca un botón para enviar mensaje"
+    end
     
-    -- Actualizar posición central
-    local centerAbsPos = centerCircle.AbsolutePosition
-    local centerSize = centerCircle.AbsoluteSize
+    -- Actualizar posición central para detección de toques
+    local centerAbsPos = mainFrame.AbsolutePosition
+    local centerSize = mainFrame.AbsoluteSize
     wheelCenter = Vector2.new(
         centerAbsPos.X + centerSize.X / 2,
         centerAbsPos.Y + centerSize.Y / 2
     )
 end
 
--- Función para ocultar la rueda
+-- Función para ocultar la rueda con animación
 local function hideWheel()
-    centerCircle.Visible = false
-    selectedMessage.Visible = false
-    
-    for _, section in ipairs(sections) do
-        section.Visible = false
-        local label = section:FindFirstChild("Label")
-        if label then
-            label.Visible = false
-        end
-    end
-    
     isWheelVisible = false
+    
+    -- Animación para ocultar
+    for i, section in ipairs(sections) do
+        local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        local tween = TweenService:Create(section, tweenInfo, {Size = UDim2.new(0, 10, 0, 10)})
+        tween:Play()
+        
+        delay(0.2, function()
+            section.Visible = false
+        end)
+    end
+    
+    if selectedLabel then
+        selectedLabel.Visible = false
+    end
+    
+    centerCircle.Visible = true
 end
 
--- Función para minimizar
-local function minimizeWheel()
-    if isMinimized then
-        -- Restaurar
-        mainFrame.Size = UDim2.new(0, 250, 0, 250)
-        showWheel()
-    else
-        -- Minimizar
-        mainFrame.Size = UDim2.new(0, 250, 0, 25)
-        hideWheel()
+-- Función para enviar mensaje
+local function sendMessage(message)
+    print("📱 Mensaje enviado: " .. message)
+    
+    -- Intentar enviar al chat del juego
+    local success, result = pcall(function()
+        local chatService = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+        if chatService then
+            chatService:FindFirstChild("SayMessageRequest"):FireServer(message, "All")
+        end
+    end)
+    
+    if not success then
+        print("⚠️ No se pudo enviar al chat, pero el mensaje es: " .. message)
     end
-    isMinimized = not isMinimized
 end
 
--- Función para detectar en qué sección se hizo clic
-local function getSelectedSection(mousePosition, wheelCenter, sections)
-    if not wheelCenter then return nil end
-    
-    local relativePos = Vector2.new(
-        mousePosition.X - wheelCenter.X,
-        mousePosition.Y - wheelCenter.Y
-    )
-    
-    -- Calcular ángulo
-    local angle = math.atan2(relativePos.Y, relativePos.X) * (180 / math.pi)
-    if angle < 0 then
-        angle = angle + 360
+-- Función para mostrar tooltip
+local function showTooltip(section, show)
+    local tooltip = section:FindFirstChild("Tooltip")
+    if tooltip then
+        tooltip.Visible = show
     end
-    
-    -- Calcular distancia desde el centro
-    local distance = math.sqrt(relativePos.X^2 + relativePos.Y^2)
-    
-    -- Verificar si está dentro del radio
-    if distance < 30 or distance > WHEEL_RADIUS then
-        return nil
-    end
-    
-    -- Determinar sección
-    local angleStep = 360 / WHEEL_SECTIONS
-    local sectionIndex = math.floor(angle / angleStep) + 1
-    
-    if sectionIndex > WHEEL_SECTIONS then
-        sectionIndex = 1
-    end
-    
-    return sectionIndex
 end
 
 -- Función principal
 local function initializeWheel()
-    wheelGUI = createWheelGUI()
+    wheelGUI, selectedLabel = createWheelGUI()
     
-    -- Insertar en el Parent adecuado
+    -- Insertar en la interfaz
     if gethui then
         wheelGUI.Parent = gethui()
     elseif syn and syn.protect_gui then
@@ -360,116 +260,98 @@ local function initializeWheel()
         wheelGUI.Parent = game:GetService("CoreGui")
     end
 
-    -- Obtener referencias a los botones
-    local minimizeBtn = mainFrame.TitleBar:FindFirstChild("MinimizeBtn")
-    local closeBtn = mainFrame.TitleBar:FindFirstChild("CloseBtn")
-    
-    -- Configurar botones
-    if minimizeBtn then
-        minimizeBtn.MouseButton1Click:Connect(function()
-            minimizeWheel()
-        end)
-    end
-    
-    if closeBtn then
-        closeBtn.MouseButton1Click:Connect(function()
-            hideWheel()
-        end)
-    end
-    
-    -- Función para activar/desactivar la rueda
-    local function toggleWheel()
+    -- Configurar botón central
+    centerCircle.MouseButton1Click:Connect(function()
         if isWheelVisible then
             hideWheel()
         else
             showWheel()
         end
-    end
-    
-    -- Detectar entrada del teclado (tecla M)
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        
-        if input.KeyCode == Enum.KeyCode.M then
-            toggleWheel()
-        end
     end)
-    
-    -- También permitir abrir con clic en el centro
-    centerCircle.MouseButton1Click:Connect(function()
-        if not isWheelVisible then
-            showWheel()
-        end
-    end)
-    
-    -- Detectar clic del mouse en las secciones
+
+    -- Configurar secciones
     for i, section in ipairs(sections) do
+        -- Evento para tocar
         section.MouseButton1Click:Connect(function()
             if not isWheelVisible then return end
             
+            local sectionData = SECTION_DATA[i]
+            local fullMessage = sectionData.emoji .. " " .. sectionData.text
+            
+            -- Efecto visual al seleccionar
+            section.BackgroundTransparency = 0
+            section.Text = "✓"
+            
             -- Mostrar mensaje seleccionado
-            local message = SECTION_MESSAGES[i]
-            selectedMessage.Text = "Mensaje: " .. message
-            selectedMessage.Visible = true
+            if selectedLabel then
+                selectedLabel.Text = "✅ " .. fullMessage
+            end
             
-            -- Resaltar sección seleccionada
-            for j, sec in ipairs(sections) do
-                if j == i then
-                    sec.BackgroundTransparency = 0.3
-                    local label = sec:FindFirstChild("Label")
-                    if label then
-                        label.Visible = true
-                    end
-                else
-                    sec.BackgroundTransparency = 0.7
-                    local label = sec:FindFirstChild("Label")
-                    if label then
-                        label.Visible = false
-                    end
+            -- Enviar mensaje
+            sendMessage(fullMessage)
+            
+            -- Restaurar apariencia después de un momento
+            delay(1, function()
+                if section then
+                    section.BackgroundTransparency = 0.2
+                    section.Text = sectionData.emoji .. "\n" .. string.sub(sectionData.text, 1, 4)
                 end
-            end
+            end)
             
-            -- Enviar mensaje al chat (opcional)
-            if message then
-                print("Mensaje seleccionado: " .. message)
-                -- Para enviar al chat del juego, descomenta la siguiente línea:
-                -- game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, "All")
-            end
-            
-            -- Ocultar la rueda después de 2 segundos
-            wait(2)
-            if isWheelVisible then
-                hideWheel()
-            end
+            -- Ocultar rueda después de 2 segundos
+            delay(2, function()
+                if isWheelVisible then
+                    hideWheel()
+                end
+            end)
+        end)
+        
+        -- Eventos para tooltips
+        section.MouseEnter:Connect(function()
+            showTooltip(section, true)
+        end)
+        
+        section.MouseLeave:Connect(function()
+            showTooltip(section, false)
         end)
     end
     
-    -- Mostrar el centro inicialmente (pero no la rueda completa)
-    centerCircle.Visible = true
+    -- Hacer la ventana movible
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
     
-    -- Actualizar etiquetas en tiempo real cuando el mouse se mueve sobre las secciones
-    RunService.RenderStepped:Connect(function()
-        if not isWheelVisible or not wheelCenter then return end
-        
-        local mousePos = UserInputService:GetMouseLocation()
-        local hoverIndex = getSelectedSection(mousePos, wheelCenter, sections)
-        
-        for i, section in ipairs(sections) do
-            local label = section:FindFirstChild("Label")
-            if label then
-                label.Visible = (i == hoverIndex)
-            end
+    mainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
         end
     end)
+    
+    mainFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(
+                startPos.X.Scale, 
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale, 
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    print("🎯 Rueda de mensajes móvil CARGADA")
+    print("💬 Toca el botón azul central para abrir")
+    print("👆 Los botones muestran emoji y texto")
+    print("🧭 Arrastra para mover la ventana")
 end
 
--- Inicializar la rueda
+-- Inicializar
 initializeWheel()
-
-print("Rueda de mensajes cargada!")
-print("Controles:")
-print("- Presiona M para abrir/cerrar la rueda")
-print("- Haz clic en el círculo central para abrir")
-print("- Arrastra la barra de título para mover")
-print("- Usa _ para minimizar")
-print("- Haz clic en cualquier sección para enviar mensaje")
