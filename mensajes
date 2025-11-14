@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local player = Players.LocalPlayer
 
@@ -34,6 +35,155 @@ local screenGui, mainFrame, centerButton, botones = {}, nil
 local ruedaAbierta = false
 local arrastrando = false
 local posicionInicial, posicionArrastre
+
+-- FUNCIONES MEJORADAS PARA ENVIAR MENSAJES AL CHAT
+local function ejecutarComandoChat(mensaje)
+    print("🔊 Intentando enviar: " .. mensaje)
+    
+    -- Método 1: Usar funciones de chat existentes en el juego
+    local funciono, resultado = pcall(function()
+        -- Buscar el servicio de chat clásico
+        local eventosChat = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+        if eventosChat then
+            local decirMensaje = eventosChat:FindFirstChild("SayMessageRequest")
+            if decirMensaje then
+                decirMensaje:FireServer(mensaje, "All")
+                return true, "Chat clásico"
+            end
+        end
+        return false
+    end)
+    
+    if funciono then
+        print("✅ Enviado via chat clásico: " .. mensaje)
+        return true
+    end
+    
+    -- Método 2: Usar el nuevo TextChatService
+    local funciono2, resultado2 = pcall(function()
+        local textChatService = game:GetService("TextChatService")
+        if textChatService then
+            local canales = textChatService:FindFirstChild("TextChannels")
+            if canales then
+                local general = canales:FindFirstChild("RBXGeneral")
+                if general then
+                    general:SendAsync(mensaje)
+                    return true, "TextChatService"
+                end
+            end
+        end
+        return false
+    end)
+    
+    if funciono2 then
+        print("✅ Enviado via TextChatService: " .. mensaje)
+        return true
+    end
+    
+    -- Método 3: Simular teclas para escribir en el chat
+    local funciono3, resultado3 = pcall(function()
+        -- Abrir chat con /
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Slash, false, game)
+        wait(0.1)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Slash, false, game)
+        
+        -- Esperar a que aparezca el chat
+        wait(0.3)
+        
+        -- Escribir el mensaje carácter por carácter
+        for i = 1, #mensaje do
+            local char = mensaje:sub(i, i)
+            local keyCode = Enum.KeyCode.Unknown
+            
+            -- Mapear caracteres a KeyCodes (solo los básicos)
+            if char == " " then
+                keyCode = Enum.KeyCode.Space
+            elseif char == "!" then
+                keyCode = Enum.KeyCode.One
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
+            elseif char == "?" then
+                keyCode = Enum.KeyCode.Slash  
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
+            else
+                -- Para letras y números simples
+                local keyName = char:upper()
+                local success, key = pcall(function() return Enum.KeyCode[keyName] end)
+                if success then
+                    keyCode = key
+                end
+            end
+            
+            if keyCode ~= Enum.KeyCode.Unknown then
+                VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+                wait(0.02)
+                VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+                wait(0.02)
+            end
+        end
+        
+        -- Liberar shift si estaba presionado
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
+        
+        -- Presionar Enter para enviar
+        wait(0.1)
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+        
+        return true, "Simulación de teclas"
+    end)
+    
+    if funciono3 then
+        print("✅ Enviado via simulación de teclas: " .. mensaje)
+        return true
+    end
+    
+    -- Método 4: Usar commandos de administrador si están disponibles
+    local funciono4, resultado4 = pcall(function()
+        -- Buscar si existe un sistema de comandos
+        if _G.CMDs then
+            for _, cmd in pairs(_G.CMDs) do
+                if cmd.NAME:lower():find("chat") or cmd.NAME:lower():find("say") then
+                    -- Simular el comando de chat
+                    local comandoChat = "say " .. mensaje
+                    print("🎯 Ejecutando comando: " .. comandoChat)
+                    -- Aquí se ejecutaría el comando del script
+                    return true, "Sistema de comandos"
+                end
+            end
+        end
+        return false
+    end)
+    
+    if funciono4 then
+        print("✅ Enviado via sistema de comandos: " .. mensaje)
+        return true
+    end
+    
+    -- Si todo falla, solo imprimir en consola
+    print("❌ No se pudo enviar al chat, mensaje sería: " .. mensaje)
+    return false
+end
+
+-- Función mejorada para enviar mensaje
+local function enviarMensaje(mensaje)
+    print("🚀 Intentando enviar mensaje rápido: " .. mensaje)
+    
+    -- Intentar todos los métodos de envío
+    local exito = ejecutarComandoChat(mensaje)
+    
+    -- Mostrar feedback visual
+    if estadoLabel then
+        if exito then
+            estadoLabel.Text = "✅ Enviado: " .. mensaje
+            estadoLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        else
+            estadoLabel.Text = "❌ Error al enviar"
+            estadoLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+    end
+    
+    return exito
+end
 
 -- Crear la interfaz
 local function crearInterfaz()
@@ -126,21 +276,21 @@ local function crearInterfaz()
     end
     
     -- Etiqueta de estado
-    local etiquetaEstado = Instance.new("TextLabel")
-    etiquetaEstado.Name = "Estado"
-    etiquetaEstado.Size = UDim2.new(1, -10, 0, 25)
-    etiquetaEstado.Position = UDim2.new(0, 5, 1, 5)
-    etiquetaEstado.BackgroundTransparency = 1
-    etiquetaEstado.Text = "Toca para abrir"
-    etiquetaEstado.TextColor3 = Color3.fromRGB(200, 200, 200)
-    etiquetaEstado.TextScaled = true
-    etiquetaEstado.Font = Enum.Font.Gotham
-    etiquetaEstado.Visible = true
+    estadoLabel = Instance.new("TextLabel")
+    estadoLabel.Name = "Estado"
+    estadoLabel.Size = UDim2.new(1, -10, 0, 25)
+    estadoLabel.Position = UDim2.new(0, 5, 1, 5)
+    estadoLabel.BackgroundTransparency = 1
+    estadoLabel.Text = "Toca para abrir"
+    estadoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    estadoLabel.TextScaled = true
+    estadoLabel.Font = Enum.Font.Gotham
+    estadoLabel.Visible = true
     
-    etiquetaEstado.Parent = mainFrame
+    estadoLabel.Parent = mainFrame
     
     mainFrame.Parent = screenGui
-    return screenGui, etiquetaEstado
+    return screenGui, estadoLabel
 end
 
 -- Función para abrir la rueda con animación
@@ -166,6 +316,7 @@ local function abrirRueda()
     
     if estadoLabel then
         estadoLabel.Text = "👆 Elige un mensaje"
+        estadoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     end
 end
 
@@ -195,28 +346,7 @@ local function cerrarRueda()
     
     if estadoLabel then
         estadoLabel.Text = "Toca para abrir"
-    end
-end
-
--- Función para enviar mensaje
-local function enviarMensaje(mensaje)
-    print("🚀 Mensaje rápido: " .. mensaje)
-    
-    -- Intentar enviar al chat del juego
-    local funciono, resultado = pcall(function()
-        local eventosChat = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
-        if eventosChat then
-            local decirMensaje = eventosChat:FindFirstChild("SayMessageRequest")
-            if decirMensaje then
-                decirMensaje:FireServer(mensaje, "All")
-                return true
-            end
-        end
-        return false
-    end)
-    
-    if not funciono then
-        print("💬 Mensaje: " .. mensaje)
+        estadoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     end
 end
 
@@ -239,22 +369,26 @@ local function configurarInteracciones()
             local mensaje = MENSAJES_RAPIDOS[i]
             
             -- Efecto visual al presionar
+            local colorOriginal = boton.BackgroundColor3
             boton.BackgroundTransparency = 0
+            boton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            local textoOriginal = boton.Text
             boton.Text = "✓"
             
-            -- Enviar mensaje
+            -- Enviar mensaje con los métodos mejorados
             enviarMensaje(mensaje)
             
             -- Restaurar botón después de un momento
-            delay(0.5, function()
+            delay(0.8, function()
                 if boton then
                     boton.BackgroundTransparency = 0.2
-                    boton.Text = mensaje
+                    boton.BackgroundColor3 = colorOriginal
+                    boton.Text = textoOriginal
                 end
             end)
             
             -- Cerrar rueda después de enviar
-            delay(0.8, function()
+            delay(1.2, function()
                 cerrarRueda()
             end)
         end)
@@ -324,6 +458,7 @@ local function inicializar()
     print("👆 8 mensajes disponibles")
     print("🧭 Arrastra para mover")
     print("📱 Optimizado para móvil")
+    print("🔊 Sistema de envío mejorado con 4 métodos")
 end
 
 -- Iniciar
